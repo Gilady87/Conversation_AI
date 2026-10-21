@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced Chat System - Ollama & llama-server</title>
+  <style>
+    :root {
+      --primary-color: #4a6fa5;
+      --secondary-color: #6d9dc5;
+      --accent-color: #2e4057;
+      --light-color: #f7f9fb;
+      --dark-color: #1a1a1a;
+      --model1-color: #ff7e5f;
+      --model2-color: #00b4d8;
+      --human-color: #9b59b6;
+      --pro-color: #27ae60;
+      --con-color: #e74c3c;
+      --moderator-color: #f39c12;
+      --success-color: #27ae60;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background-color: var(--light-color);
+      color: var(--dark-color);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      color: white;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      position: relative;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+    }
+
+    main {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      padding: 1rem;
+      overflow: hidden;
+    }
+
+    .setup-section {
+      background-color: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+
+    .mode-selector {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .mode-button {
+      padding: 0.75rem 2rem;
+      border: 2px solid var(--primary-color);
+      background-color: white;
+      color: var(--primary-color);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+      transition: all 0.3s;
+    }
+
+    .mode-button:hover {
+      background-color: var(--light-color);
+    }
+
+    .mode-button.active {
+      background-color: var(--primary-color);
+      color: white;
+    }
+
+    .backend-selector {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      background-color: var(--light-color);
+      border-radius: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .backend-option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent-color);
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      transition: background-color 0.2s;
+    }
+
+    .backend-option:hover {
+      background-color: rgba(74, 111, 165, 0.1);
+    }
+
+    .backend-option input[type="radio"] {
+      width: auto;
+      cursor: pointer;
+    }
+
+    .backend-option input[type="radio"]:checked + span {
+      color: var(--primary-color);
+    }
+
+    .llama-server-config {
+      display: none;
+      padding: 1rem;
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+
+    .llama-server-config.active {
+      display: block;
+    }
+
+    .server-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .server-status.online {
+      background-color: var(--success-color);
+      color: white;
+    }
+
+    .server-status.offline {
+      background-color: var(--con-color);
+      color: white;
+    }
+
+    .advanced-params {
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+    }
+
+    .advanced-params-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      padding: 0.5rem;
+      border-radius: 6px;
+      transition: background-color 0.2s;
+    }
+
+    .advanced-params-header:hover {
+      background-color: rgba(74, 111, 165, 0.1);
+    }
+
+    .advanced-params-content {
+      display: none;
+      margin-top: 1rem;
+    }
+
+    .advanced-params-content.active {
+      display: block;
+    }
+
+    .params-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .param-control {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .param-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--accent-color);
+    }
+
+    .param-value {
+      color: var(--primary-color);
+      font-family: monospace;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .setup-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: var(--accent-color);
+    }
+
+    select, input[type="text"], input[type="number"], input[type="url"] {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    .debate-setup {
+      display: none;
+    }
+
+    .debate-setup.active {
+      display: block;
+    }
+
+    .debate-teams {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .team-box {
+      padding: 1rem;
+      border-radius: 8px;
+      border: 2px solid;
+    }
+
+    .team-pro {
+      border-color: var(--pro-color);
+      background-color: rgba(39, 174, 96, 0.05);
+    }
+
+    .team-con {
+      border-color: var(--con-color);
+      background-color: rgba(231, 76, 60, 0.05);
+    }
+
+    .team-moderator {
+      border-color: var(--moderator-color);
+      background-color: rgba(243, 156, 18, 0.05);
+    }
+
+    .team-title {
+      font-weight: bold;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+
+    .chat-section {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+
+    .chat-header {
+      background-color: var(--secondary-color);
+      color: white;
+      padding: 0.75rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .round-indicator {
+      background-color: var(--accent-color);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.9rem;
+    }
+
+    .score-display {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .score-item {
+      background-color: rgba(255, 255, 255, 0.2);
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.9rem;
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 1rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .message {
+      padding: 1rem;
+      border-radius: 8px;
+      max-width: 85%;
+      position: relative;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .model1 {
+      background-color: var(--model1-color);
+      color: white;
+      align-self: flex-start;
+    }
+
+    .model2 {
+      background-color: var(--model2-color);
+      color: white;
+      align-self: flex-end;
+    }
+
+    .human {
+      background-color: var(--human-color);
+      color: white;
+      align-self: center;
+      max-width: 90%;
+      border: 3px solid var(--dark-color);
+    }
+
+    .pro {
+      background-color: var(--pro-color);
+      color: white;
+      align-self: flex-start;
+    }
+
+    .con {
+      background-color: var(--con-color);
+      color: white;
+      align-self: flex-end;
+    }
+
+    .moderator {
+      background-color: var(--moderator-color);
+      color: white;
+      align-self: center;
+      max-width: 95%;
+      font-style: italic;
+    }
+
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+
+    .message-content {
+      line-height: 1.5;
+    }
+
+    .message-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .speak-button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: white;
+      font-size: 1.2rem;
+      transition: transform 0.2s;
+    }
+
+    .speak-button:hover {
+      transform: scale(1.2);
+    }
+
+    .human-input-section {
+      background-color: #f5f5f5;
+      padding: 1rem;
+      border-top: 2px solid var(--human-color);
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .human-input-section input {
+      flex: 1;
+      padding: 0.75rem;
+      border: 2px solid var(--human-color);
+      border-radius: 4px;
+    }
+
+    .human-input-section button {
+      background-color: var(--human-color);
+      padding: 0.75rem 1.5rem;
+      white-space: nowrap;
+    }
+
+    .human-input-section button:hover {
+      background-color: #8e44ad;
+    }
+
+    .controls {
+      display: flex;
+      padding: 1rem;
+      gap: 1rem;
+      background-color: #f5f5f5;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: var(--accent-color);
+    }
+
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+
+    .stop-button {
+      background-color: #e74c3c;
+    }
+
+    .stop-button:hover {
+      background-color: #c0392b;
+    }
+
+    .reset-button {
+      background-color: #3498db;
+    }
+
+    .reset-button:hover {
+      background-color: #2980b9;
+    }
+
+    .status {
+      padding: 0.5rem;
+      text-align: center;
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    .connection-status {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    .online {
+      background-color: #2ecc71;
+      color: white;
+    }
+
+    .offline {
+      background-color: #e74c3c;
+      color: white;
+    }
+    
+    .language-switch {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(255, 255, 255, 0.2);
+      padding: 5px 10px;
+      border-radius: 4px;
+      color: white;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    
+    .language-switch:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .debate-teams {
+        grid-template-columns: 1fr;
+      }
+      
+      .backend-selector {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🤖 Advanced Chat System 🎯</h1>
+    <p>Ollama & llama-server | Conversations, Debates & Human Participation</p>
+    <a href="/" class="language-switch">עברית</a>
+  </header>
+
+  <main>
+    <section class="setup-section">
+      <div class="mode-selector">
+        <button class="mode-button active" data-mode="regular">Regular Mode 💬</button>
+        <button class="mode-button" data-mode="debate">Debate Mode 🎭</button>
+      </div>
+
+      <div class="backend-selector">
+        <label class="backend-option">
+          <input type="radio" name="backend" value="ollama" checked>
+          <span>🌐 Ollama</span>
+        </label>
+        <label class="backend-option">
+          <input type="radio" name="backend" value="llama-server">
+          <span>⚡ llama-server</span>
+        </label>
+      </div>
+
+      <div id="llamaServerConfig" class="llama-server-config">
+        <div class="form-group">
+          <label for="serverUrl">llama-server URL:</label>
+          <input type="url" id="serverUrl" value="http://127.0.0.1:8080" placeholder="http://127.0.0.1:8080">
+        </div>
+        <div style="margin-top: 0.5rem;">
+          <span id="serverStatus" class="server-status offline">🔴 Disconnected</span>
+          <button id="checkServerBtn" style="margin-left: 1rem;">Check Connection</button>
+        </div>
+      </div>
+
+      <div id="regularSetup" class="regular-setup">
+        <div class="setup-grid">
+          <div class="form-group">
+            <label for="model1">Model 1:</label>
+            <select id="model1"></select>
+          </div>
+          <div class="form-group">
+            <label for="model2">Model 2:</label>
+            <select id="model2"></select>
+          </div>
+          <div class="form-group">
+            <label for="voice1">Voice for Model 1:</label>
+            <select id="voice1"></select>
+          </div>
+          <div class="form-group">
+            <label for="voice2">Voice for Model 2:</label>
+            <select id="voice2"></select>
+          </div>
+        </div>
+        <div class="setup-grid">
+          <div class="form-group">
+            <label for="rounds">Number of Rounds:</label>
+            <input type="number" id="rounds" min="1" max="20" value="3">
+          </div>
+          <div class="form-group">
+            <label for="topic">Conversation Topic:</label>
+            <input type="text" id="topic" value="The future of artificial intelligence">
+          </div>
+        </div>
+      </div>
+
+      <div id="debateSetup" class="debate-setup">
+        <div class="form-group">
+          <label for="debateTopic">Debate Topic:</label>
+          <input type="text" id="debateTopic" value="Is artificial intelligence a threat to humanity?">
+        </div>
+        <div class="debate-teams">
+          <div class="team-box team-pro">
+            <div class="team-title">✅ Pro Side</div>
+            <div class="form-group">
+              <label for="proModel">Model:</label>
+              <select id="proModel"></select>
+            </div>
+            <div class="form-group">
+              <label for="proVoice">Voice:</label>
+              <select id="proVoice"></select>
+            </div>
+          </div>
+          <div class="team-box team-moderator">
+            <div class="team-title">⚖️ Moderator</div>
+            <div class="form-group">
+              <label for="moderatorModel">Model:</label>
+              <select id="moderatorModel"></select>
+            </div>
+            <div class="form-group">
+              <label for="moderatorVoice">Voice:</label>
+              <select id="moderatorVoice"></select>
+            </div>
+          </div>
+          <div class="team-box team-con">
+            <div class="team-title">❌ Con Side</div>
+            <div class="form-group">
+              <label for="conModel">Model:</label>
+              <select id="conModel"></select>
+            </div>
+            <div class="form-group">
+              <label for="conVoice">Voice:</label>
+              <select id="conVoice"></select>
+            </div>
+          </div>
+        </div>
+        <div class="setup-grid">
+          <div class="form-group">
+            <label for="debateRounds">Number of Rounds:</label>
+            <input type="number" id="debateRounds" min="1" max="5" value="2">
+          </div>
+        </div>
+      </div>
+
+      <div id="advancedParams" class="advanced-params" style="display: none;">
+        <div class="advanced-params-header" id="advancedParamsToggle">
+          <span style="font-weight: 600;">⚙️ Advanced Parameters</span>
+          <span id="toggleIcon">▼</span>
+        </div>
+        <div class="advanced-params-content" id="advancedParamsContent">
+          <div class="params-grid">
+            <div class="param-control">
+              <div class="param-label">
+                <span>Temperature</span>
+                <span class="param-value" id="tempValue">0.7</span>
+              </div>
+              <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7">
+            </div>
+            <div class="param-control">
+              <div class="param-label">
+                <span>Top P</span>
+                <span class="param-value" id="topPValue">0.9</span>
+              </div>
+              <input type="range" id="topP" min="0" max="1" step="0.05" value="0.9">
+            </div>
+            <div class="param-control">
+              <div class="param-label">
+                <span>Top K</span>
+                <span class="param-value" id="topKValue">40</span>
+              </div>
+              <input type="range" id="topK" min="1" max="100" step="1" value="40">
+            </div>
+            <div class="param-control">
+              <div class="param-label">
+                <span>Repeat Penalty</span>
+                <span class="param-value" id="repeatPenaltyValue">1.1</span>
+              </div>
+              <input type="range" id="repeatPenalty" min="1" max="2" step="0.05" value="1.1">
+            </div>
+            <div class="param-control">
+              <div class="param-label">
+                <span>Max Tokens</span>
+                <span class="param-value" id="maxTokensValue">512</span>
+              </div>
+              <input type="range" id="maxTokens" min="50" max="2048" step="50" value="512">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="chat-section">
+      <div class="chat-header">
+        <span id="chatTitle">Conversation</span>
+        <div class="score-display" id="scoreDisplay" style="display: none;">
+          <span class="score-item">Pro: <span id="proScore">0</span></span>
+          <span class="score-item">Con: <span id="conScore">0</span></span>
+        </div>
+        <span class="round-indicator">Round 0/0</span>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="human-input-section">
+        <input type="text" id="humanInput" placeholder="Type your message to join... (Press Enter)" disabled>
+        <button id="sendHumanMessage" disabled>📤 Send</button>
+      </div>
+      <div class="controls">
+        <button id="startButton">▶️ Start</button>
+        <button id="stopButton" class="stop-button" disabled>⏹️ Stop</button>
+        <button id="resetButton" class="reset-button">🗑️ Clear</button>
+      </div>
+      <div class="status">
+        <span id="status">Ready to start</span>
+        <span id="speechStatus" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+  </main>
+
+  <div id="connectionStatus" class="connection-status offline">Disconnected</div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // [Same JavaScript code as Hebrew version, with English text for alerts/messages]
+    const socket = io();
+    const connectionStatus = document.getElementById('connectionStatus');
+    
+    socket.on('connect', () => {
+      connectionStatus.textContent = 'Connected';
+      connectionStatus.className = 'connection-status online';
+    });
+    
+    socket.on('disconnect', () => {
+      connectionStatus.textContent = 'Disconnected';
+      connectionStatus.className = 'connection-status offline';
+    });
+
+    const modeButtons = document.querySelectorAll('.mode-button');
+    const regularSetup = document.getElementById('regularSetup');
+    const debateSetup = document.getElementById('debateSetup');
+    const backendRadios = document.querySelectorAll('input[name="backend"]');
+    const llamaServerConfig = document.getElementById('llamaServerConfig');
+    const serverUrlInput = document.getElementById('serverUrl');
+    const serverStatus = document.getElementById('serverStatus');
+    const checkServerBtn = document.getElementById('checkServerBtn');
+    const advancedParams = document.getElementById('advancedParams');
+    const advancedParamsToggle = document.getElementById('advancedParamsToggle');
+    const advancedParamsContent = document.getElementById('advancedParamsContent');
+    const toggleIcon = document.getElementById('toggleIcon');
+    
+    const model1Select = document.getElementById('model1');
+    const model2Select = document.getElementById('model2');
+    const voice1Select = document.getElementById('voice1');
+    const voice2Select = document.getElementById('voice2');
+    const roundsInput = document.getElementById('rounds');
+    const topicInput = document.getElementById('topic');
+    
+    const proModelSelect = document.getElementById('proModel');
+    const conModelSelect = document.getElementById('conModel');
+    const moderatorModelSelect = document.getElementById('moderatorModel');
+    const proVoiceSelect = document.getElementById('proVoice');
+    const conVoiceSelect = document.getElementById('conVoice');
+    const moderatorVoiceSelect = document.getElementById('moderatorVoice');
+    const debateTopicInput = document.getElementById('debateTopic');
+    const debateRoundsInput = document.getElementById('debateRounds');
+    
+    const temperatureSlider = document.getElementById('temperature');
+    const topPSlider = document.getElementById('topP');
+    const topKSlider = document.getElementById('topK');
+    const repeatPenaltySlider = document.getElementById('repeatPenalty');
+    const maxTokensSlider = document.getElementById('maxTokens');
+    
+    const chatMessages = document.getElementById('chatMessages');
+    const startButton = document.getElementById('startButton');
+    const stopButton = document.getElementById('stopButton');
+    const resetButton = document.getElementById('resetButton');
+    const roundIndicator = document.querySelector('.round-indicator');
+    const statusElement = document.getElementById('status');
+    const speechStatusElement = document.getElementById('speechStatus');
+    const chatTitle = document.getElementById('chatTitle');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const proScoreElement = document.getElementById('proScore');
+    const conScoreElement = document.getElementById('conScore');
+    
+    const humanInput = document.getElementById('humanInput');
+    const sendHumanMessage = document.getElementById('sendHumanMessage');
+
+    let currentMode = 'regular';
+    let currentBackend = 'ollama';
+    let isChatting = false;
+    let shouldStop = false;
+    let currentRound = 0;
+    let maxRounds = 3;
+    let synth = window.speechSynthesis;
+    let voices = [];
+    let pendingHumanMessage = null;
+    let proScore = 0;
+    let conScore = 0;
+    let chatRunId = 0;
+    let generationController = null;
+
+    modeButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        if (isChatting) {
+          alert('Cannot change mode during conversation');
+          return;
+        }
+        
+        modeButtons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        currentMode = button.dataset.mode;
+        
+        if (currentMode === 'regular') {
+          regularSetup.style.display = 'block';
+          debateSetup.classList.remove('active');
+          chatTitle.textContent = 'Conversation';
+          scoreDisplay.style.display = 'none';
+        } else {
+          regularSetup.style.display = 'none';
+          debateSetup.classList.add('active');
+          chatTitle.textContent = 'Debate';
+          scoreDisplay.style.display = 'flex';
+        }
+      });
+    });
+
+    backendRadios.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        if (isChatting) {
+          alert('Cannot change backend during conversation');
+          e.target.checked = false;
+          document.querySelector(`input[name="backend"][value="${currentBackend}"]`).checked = true;
+          return;
+        }
+        
+        currentBackend = e.target.value;
+        
+        if (currentBackend === 'llama-server') {
+          llamaServerConfig.classList.add('active');
+          advancedParams.style.display = 'block';
+        } else {
+          llamaServerConfig.classList.remove('active');
+          advancedParams.style.display = 'none';
+        }
+        
+        loadModels();
+      });
+    });
+
+    advancedParamsToggle.addEventListener('click', () => {
+      advancedParamsContent.classList.toggle('active');
+      toggleIcon.textContent = advancedParamsContent.classList.contains('active') ? '▲' : '▼';
+    });
+
+    temperatureSlider.addEventListener('input', (e) => {
+      document.getElementById('tempValue').textContent = e.target.value;
+    });
+    
+    topPSlider.addEventListener('input', (e) => {
+      document.getElementById('topPValue').textContent = e.target.value;
+    });
+    
+    topKSlider.addEventListener('input', (e) => {
+      document.getElementById('topKValue').textContent = e.target.value;
+    });
+    
+    repeatPenaltySlider.addEventListener('input', (e) => {
+      document.getElementById('repeatPenaltyValue').textContent = e.target.value;
+    });
+    
+    maxTokensSlider.addEventListener('input', (e) => {
+      document.getElementById('maxTokensValue').textContent = e.target.value;
+    });
+
+    checkServerBtn.addEventListener('click', async () => {
+      const url = serverUrlInput.value;
+      updateStatus('Checking llama-server connection...');
+      
+      try {
+        const response = await fetch(`/api/llama-server/health?url=${encodeURIComponent(url)}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+          serverStatus.className = 'server-status online';
+          serverStatus.textContent = '🟢 Connected';
+          updateStatus('✅ llama-server available!');
+          loadModels();
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        serverStatus.className = 'server-status offline';
+        serverStatus.textContent = '🔴 Disconnected';
+        updateStatus('❌ llama-server not available');
+        console.error('Server check error:', error);
+      }
+    });
+
+    function loadVoices() {
+      voices = synth.getVoices();
+      const multilingualVoices = voices.filter(voice => voice.name.includes('Multilingual'));
+      const voicesToUse = multilingualVoices.length > 0 ? multilingualVoices : voices;
+      
+      const voiceSelects = [voice1Select, voice2Select, proVoiceSelect, conVoiceSelect, moderatorVoiceSelect];
+      
+      voiceSelects.forEach((select, idx) => {
+        select.innerHTML = '<option value="">Select a voice</option>';
+        voicesToUse.forEach(voice => {
+          const option = document.createElement('option');
+          option.value = voice.name;
+          option.textContent = `${voice.name} (${voice.lang})`;
+          select.appendChild(option);
+        });
+        if (select.options.length > idx + 1) {
+          select.selectedIndex = idx + 1;
+        } else if (select.options.length > 1) {
+          select.selectedIndex = 1;
+        }
+      });
+    }
+
+    async function initialize() {
+      await loadModels();
+      if (synth) loadVoices();
+    }
+    
+    async function loadModels() {
+      updateStatus('Loading models...');
+      
+      try {
+        let models = [];
+        
+        if (currentBackend === 'ollama') {
+          const response = await fetch('/api/models');
+          if (!response.ok) throw new Error('Failed to fetch Ollama models');
+          models = await response.json();
+          
+          if (models.length === 0) {
+            updateStatus('❌ No Ollama models found');
+            startButton.disabled = true;
+            return;
+          }
+        } else {
+          models = ['Current Model'];
+        }
+        
+        const modelSelects = [model1Select, model2Select, proModelSelect, conModelSelect, moderatorModelSelect];
+        modelSelects.forEach((select, idx) => {
+          populateSelect(select, models, idx % models.length);
+        });
+        
+        startButton.disabled = false;
+        updateStatus(`✅ ${currentBackend === 'ollama' ? 'Ollama models' : 'llama-server'} ready`);
+      } catch (error) {
+        console.error('Error loading models:', error);
+        updateStatus('❌ Error loading models');
+        startButton.disabled = true;
+      }
+    }
+
+    function populateSelect(selectElement, options, defaultIndex = 0) {
+      selectElement.innerHTML = '';
+      options.forEach((option) => {
+        const optionElement = document.createElement('option');
+        optionElement.value = option;
+        optionElement.textContent = option;
+        selectElement.appendChild(optionElement);
+      });
+      
+      if (options.length > defaultIndex) {
+        selectElement.selectedIndex = defaultIndex;
+      }
+    }
+
+    function updateStatus(message) {
+      statusElement.textContent = message;
+    }
+
+    function addMessage(text, messageType, modelName, role = '') {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${messageType}`;
+      
+      const header = document.createElement('div');
+      header.className = 'message-header';
+      
+      const modelLabel = document.createElement('span');
+      modelLabel.textContent = role ? `${role} - ${modelName}` : modelName;
+      
+      const actions = document.createElement('div');
+      actions.className = 'message-actions';
+      
+      const speakButton = document.createElement('button');
+      speakButton.className = 'speak-button';
+      speakButton.innerHTML = '🔊';
+      speakButton.title = 'Read aloud';
+      speakButton.onclick = () => {
+        const voiceSelect = {
+          model1: voice1Select,
+          model2: voice2Select,
+          pro: proVoiceSelect,
+          con: conVoiceSelect,
+          moderator: moderatorVoiceSelect
+        }[messageType] || moderatorVoiceSelect;
+        speak(text, voiceSelect);
+      };
+      
+      const edgeButton = document.createElement('button');
+      edgeButton.className = 'speak-button';
+      edgeButton.innerHTML = '📡';
+      edgeButton.title = 'Open in Edge';
+      edgeButton.onclick = () => speakWithEdge(text);
+      
+      if (messageType !== 'human') {
+        actions.appendChild(speakButton);
+        actions.appendChild(edgeButton);
+      }
+      
+      header.appendChild(modelLabel);
+      header.appendChild(actions);
+      
+      const content = document.createElement('div');
+      content.className = 'message-content';
+      content.textContent = text;
+      
+      messageDiv.appendChild(header);
+      messageDiv.appendChild(content);
+      
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    class SpeechPlaybackQueue {
+      constructor(synthesis, Utterance, onChange) {
+        this.synthesis = synthesis;
+        this.Utterance = Utterance;
+        this.onChange = onChange;
+        this.queue = [];
+        this.active = null;
+        this.idleWaiters = [];
+      }
+
+      get busy() {
+        return this.active !== null || this.queue.length > 0;
+      }
+
+      enqueue(text, voice) {
+        if (!text || !String(text).trim() || !this.synthesis || !this.Utterance) {
+          return Promise.resolve('skipped');
+        }
+        return new Promise(resolve => {
+          // Capture the voice now; changing a selector must not change queued replies.
+          this.queue.push({ text: String(text), voice, resolve, utterance: null });
+          this.pump();
+          this.onChange();
+        });
+      }
+
+      pump() {
+        if (this.active) return;
+        const item = this.queue.shift();
+        if (!item) {
+          this.notifyIdle();
+          return;
+        }
+        // Keep a strong reference until this utterance ends or is cancelled.
+        this.active = item;
+        try {
+          const utterance = new this.Utterance(item.text);
+          item.utterance = utterance;
+          if (item.voice) {
+            utterance.voice = item.voice;
+            utterance.lang = item.voice.lang;
+          }
+          utterance.rate = 1;
+          utterance.pitch = 1;
+          utterance.onend = () => this.finish(item, 'ended');
+          utterance.onerror = event => this.finish(item, 'error', event.error);
+          if (this.synthesis.paused) this.synthesis.resume();
+          this.synthesis.speak(utterance);
+        } catch (error) {
+          this.finish(item, 'error', error);
+        }
+        this.onChange();
+      }
+
+      finish(item, result, error) {
+        // Ignore duplicate events and late callbacks from a cancelled session.
+        if (this.active !== item) return;
+        if (item.utterance) {
+          item.utterance.onend = null;
+          item.utterance.onerror = null;
+        }
+        this.active = null;
+        if (error) console.warn('Speech playback failed:', error);
+        item.resolve(result);
+        this.onChange();
+        this.notifyIdle();
+        // Only an end/error event releases the next reply. There is no duration timer.
+        queueMicrotask(() => this.pump());
+      }
+
+      whenIdle() {
+        if (!this.busy) return Promise.resolve();
+        return new Promise(resolve => this.idleWaiters.push(resolve));
+      }
+
+      notifyIdle() {
+        if (!this.busy) {
+          this.idleWaiters.splice(0).forEach(resolve => resolve());
+        }
+      }
+
+      cancel() {
+        const active = this.active;
+        const waiting = this.queue.splice(0);
+        this.active = null;
+        if (active && active.utterance) {
+          active.utterance.onend = null;
+          active.utterance.onerror = null;
+        }
+        try {
+          if (active && this.synthesis) this.synthesis.cancel();
+        } catch (error) {
+          console.warn('Could not cancel speech:', error);
+        } finally {
+          if (active) active.resolve('cancelled');
+          waiting.forEach(item => item.resolve('cancelled'));
+          this.onChange();
+          this.notifyIdle();
+        }
+      }
+    }
+
+    const speechPlayback = new SpeechPlaybackQueue(synth, window.SpeechSynthesisUtterance, () => {
+      speechStatusElement.textContent = speechPlayback.busy
+        ? ` · Audio: ${speechPlayback.active ? 'playing' : 'waiting'} · ${speechPlayback.queue.length} queued`
+        : ' · Audio: idle';
+      stopButton.disabled = !isChatting && !speechPlayback.busy;
+    });
+
+    function speak(text, selectElement) {
+      const selectedVoice = voices.find(voice => voice.name === selectElement.value) || null;
+      return speechPlayback.enqueue(text, selectedVoice);
+    }
+
+    async function speakWithEdge(text) {
+      try {
+        const response = await fetch('/api/speak-with-edge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        
+        const data = await response.json();
+        if (data.success) updateStatus('Text opened in Edge');
+      } catch (error) {
+        console.error('Error opening Edge:', error);
+      }
+    }
+
+    async function generateResponse(model, prompt) {
+      const runId = chatRunId;
+      const signal = generationController ? generationController.signal : null;
+      if (shouldStop || (signal && signal.aborted)) {
+        throw new DOMException('Conversation stopped', 'AbortError');
+      }
+      try {
+        if (currentBackend === 'ollama') {
+          const response = await fetch('/api/generate', {
+            method: 'POST',
+            signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, model })
+          });
+          
+          if (!response.ok) throw new Error(`Generation failed: HTTP ${response.status}`);
+          const data = await response.json();
+          if (runId !== chatRunId || (signal && signal.aborted)) {
+            throw new DOMException('Conversation stopped', 'AbortError');
+          }
+          return data.response;
+        } else {
+          const response = await fetch('/api/llama-server/generate', {
+            method: 'POST',
+            signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              prompt, 
+              serverUrl: serverUrlInput.value,
+              temperature: parseFloat(temperatureSlider.value),
+              top_p: parseFloat(topPSlider.value),
+              top_k: parseInt(topKSlider.value),
+              repeat_penalty: parseFloat(repeatPenaltySlider.value),
+              max_tokens: parseInt(maxTokensSlider.value)
+            })
+          });
+          
+          if (!response.ok) throw new Error(`Generation failed: HTTP ${response.status}`);
+          const data = await response.json();
+          if (runId !== chatRunId || (signal && signal.aborted)) {
+            throw new DOMException('Conversation stopped', 'AbortError');
+          }
+          return data.response;
+        }
+      } catch (error) {
+        if (error.name !== 'AbortError') console.error('Error generating response:', error);
+        throw error;
+      }
+    }
+
+    async function startRegularChat() {
+      const model1 = model1Select.value;
+      const model2 = model2Select.value;
+      maxRounds = parseInt(roundsInput.value, 10);
+      const topic = topicInput.value;
+      
+      let prompt = `Start a conversation about ${topic}. Keep responses short, 2-3 sentences.`;
+      
+      for (let i = 1; i <= maxRounds; i++) {
+        if (shouldStop) break;
+        
+        currentRound = i;
+        updateRoundIndicator();
+        
+        if (pendingHumanMessage) {
+          addMessage(pendingHumanMessage, 'human', 'You');
+          prompt = pendingHumanMessage;
+          pendingHumanMessage = null;
+
+        }
+        
+        updateStatus(`Waiting for model 1...`);
+        const response1 = await generateResponse(model1, prompt);
+        if (response1 && !shouldStop) {
+          addMessage(response1, 'model1', model1);
+          speak(response1, voice1Select);
+
+          prompt = response1;
+        } else break;
+        
+        if (shouldStop) break;
+        
+        if (pendingHumanMessage) {
+          addMessage(pendingHumanMessage, 'human', 'You');
+          prompt = pendingHumanMessage;
+          pendingHumanMessage = null;
+
+        }
+        
+        updateStatus(`Waiting for model 2...`);
+        const response2 = await generateResponse(model2, prompt);
+        if (response2 && !shouldStop) {
+          addMessage(response2, 'model2', model2);
+          speak(response2, voice2Select);
+
+          prompt = response2;
+        } else break;
+      }
+    }
+
+    async function startDebate() {
+      const proModel = proModelSelect.value;
+      const conModel = conModelSelect.value;
+      const moderatorModel = moderatorModelSelect.value;
+      const topic = debateTopicInput.value;
+      maxRounds = parseInt(debateRoundsInput.value, 10);
+      
+      proScore = 0;
+      conScore = 0;
+      updateScores();
+      
+      updateStatus('Moderator opening...');
+      const opening = await generateResponse(moderatorModel, 
+        `You are a debate moderator. Open the debate on: "${topic}". 2-3 sentences.`);
+      
+      if (opening && !shouldStop) {
+        addMessage(opening, 'moderator', moderatorModel, 'Moderator');
+        speak(opening, moderatorVoiceSelect);
+
+      }
+      
+      currentRound = 0;
+      updateRoundIndicator();
+      
+      updateStatus('Pro side...');
+      const proOpening = await generateResponse(proModel,
+        `You are in favor of: "${topic}". Present your position. 2-3 sentences.`);
+      
+      if (proOpening && !shouldStop) {
+        addMessage(proOpening, 'pro', proModel, 'Pro');
+        speak(proOpening, proVoiceSelect);
+
+      }
+      
+      updateStatus('Con side...');
+      const conOpening = await generateResponse(conModel,
+        `You are against: "${topic}". Present your position. 2-3 sentences.`);
+      
+      if (conOpening && !shouldStop) {
+        addMessage(conOpening, 'con', conModel, 'Con');
+        speak(conOpening, conVoiceSelect);
+
+      }
+      
+      let lastProArgument = proOpening;
+      let lastConArgument = conOpening;
+      
+      for (let i = 1; i <= maxRounds; i++) {
+        if (shouldStop) break;
+        
+        currentRound = i;
+        updateRoundIndicator();
+        
+        if (pendingHumanMessage) {
+          addMessage(pendingHumanMessage, 'human', 'You');
+
+          
+          const modResponse = await generateResponse(moderatorModel,
+            `As moderator, respond to audience: "${pendingHumanMessage}". 2-3 sentences.`);
+          if (modResponse && !shouldStop) {
+            addMessage(modResponse, 'moderator', moderatorModel, 'Moderator');
+            speak(modResponse, moderatorVoiceSelect);
+
+          }
+          
+          pendingHumanMessage = null;
+        }
+        
+        updateStatus(`Round ${i}: Pro...`);
+        const proArg = await generateResponse(proModel,
+          `Respond to: "${lastConArgument}". Strong argument for "${topic}". 2-3 sentences.`);
+        
+        if (proArg && !shouldStop) {
+          addMessage(proArg, 'pro', proModel, 'Pro');
+          speak(proArg, proVoiceSelect);
+
+          lastProArgument = proArg;
+        }
+        
+        if (shouldStop) break;
+        
+        updateStatus(`Round ${i}: Con...`);
+        const conArg = await generateResponse(conModel,
+          `Respond to: "${lastProArgument}". Strong argument against "${topic}". 2-3 sentences.`);
+        
+        if (conArg && !shouldStop) {
+          addMessage(conArg, 'con', conModel, 'Con');
+          speak(conArg, conVoiceSelect);
+
+          lastConArgument = conArg;
+        }
+      }
+      
+      if (!shouldStop) {
+        updateStatus('Final judgment...');
+        const judgment = await generateResponse(moderatorModel,
+          `Summarize debate on "${topic}". Analyze both sides and decide who was more convincing. Give score 1-10 for each. Format: "Pro: X/10, Con: Y/10" then brief explanation.`);
+        
+        if (judgment) {
+          addMessage(judgment, 'moderator', moderatorModel, 'Final Judgment');
+          speak(judgment, moderatorVoiceSelect);
+          
+          const scoreMatch = judgment.match(/Pro:\s*(\d+)\/10.*Con:\s*(\d+)\/10/i);
+          if (scoreMatch) {
+            proScore = parseInt(scoreMatch[1]);
+            conScore = parseInt(scoreMatch[2]);
+            updateScores();
+          }
+        }
+      }
+    }
+
+    function updateScores() {
+      proScoreElement.textContent = proScore;
+      conScoreElement.textContent = conScore;
+    }
+
+    async function startChat() {
+      if (isChatting) return;
+
+      const runId = ++chatRunId;
+      isChatting = true;
+      shouldStop = false;
+      pendingHumanMessage = null;
+      generationController = new AbortController();
+      speechPlayback.cancel();
+      currentRound = 0;
+      startButton.disabled = true;
+      stopButton.disabled = false;
+      humanInput.disabled = false;
+      sendHumanMessage.disabled = false;
+      
+      updateStatus('Starting...');
+      updateRoundIndicator();
+
+      let finalStatus = 'Completed';
+      try {
+        if (currentMode === 'regular') {
+          await startRegularChat();
+        } else {
+          await startDebate();
+        }
+      } catch (error) {
+        if (runId !== chatRunId) return;
+        if (error.name === 'AbortError') finalStatus = 'Stopped';
+        else {
+          console.error('Error:', error);
+          finalStatus = '❌ Error generating replies';
+        }
+      }
+
+      if (runId !== chatRunId) return;
+      humanInput.disabled = true;
+      sendHumanMessage.disabled = true;
+      if (speechPlayback.busy) {
+        updateStatus(finalStatus === 'Completed'
+          ? 'Responses ready; finishing queued audio...'
+          : `${finalStatus}; finishing queued audio...`);
+        await speechPlayback.whenIdle();
+      }
+      if (runId !== chatRunId) return;
+      isChatting = false;
+      generationController = null;
+      startButton.disabled = false;
+      stopButton.disabled = !speechPlayback.busy;
+      updateStatus(finalStatus);
+    }
+
+    function updateRoundIndicator() {
+      roundIndicator.textContent = `Round ${currentRound}/${maxRounds}`;
+    }
+
+    function resetChat() {
+      stopChat('Cleared');
+      chatMessages.innerHTML = '';
+      currentRound = 0;
+      proScore = 0;
+      conScore = 0;
+      updateRoundIndicator();
+      updateScores();
+    }
+
+    function stopChat(status = 'Stopped') {
+      shouldStop = true;
+      ++chatRunId;
+      if (generationController) generationController.abort();
+      generationController = null;
+      isChatting = false;
+      pendingHumanMessage = null;
+      speechPlayback.cancel();
+      startButton.disabled = false;
+      stopButton.disabled = true;
+      humanInput.disabled = true;
+      sendHumanMessage.disabled = true;
+      updateStatus(status);
+    }
+
+    startButton.addEventListener('click', startChat);
+    
+    stopButton.addEventListener('click', () => stopChat());
+    
+    resetButton.addEventListener('click', resetChat);
+    
+    sendHumanMessage.addEventListener('click', () => {
+      const message = humanInput.value.trim();
+      if (message && isChatting) {
+        pendingHumanMessage = message;
+        humanInput.value = '';
+        updateStatus('Your message will be added next round...');
+      }
+    });
+    
+    humanInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendHumanMessage.click();
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', initialize);
+    window.addEventListener('pagehide', () => stopChat());
+    if (synth) synth.onvoiceschanged = loadVoices;
+  </script>
+</body>
+</html>
