@@ -6,6 +6,8 @@ ConversationAI is a browser-based playground for exploring how local LLMs respon
 
 Built with Node.js, Express, vanilla JavaScript, and the browser's Web Speech API. The supplied server includes integrations for Ollama and llama.cpp's `llama-server`; see [Current implementation notes](#current-implementation-notes) for the status of the llama-server UI connection.
 
+![Conversation_AI demo](output.gif)
+
 ## Features
 
 | Feature | Description |
