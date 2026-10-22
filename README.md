@@ -62,13 +62,13 @@ npm install
 
 ### 2. Configure the inference endpoint
 
-In `enhanced_server_sync.js`, set `OLLAMA_URL` to your Ollama instance:
+Set the `OLLAMA_URL` environment variable to your Ollama instance:
 
-```javascript
-const OLLAMA_URL = "http://127.0.0.1:11434";
+```powershell
+$env:OLLAMA_URL = "http://127.0.0.1:11434"
 ```
 
-The supplied version points to a LAN address. Replace it with your own local or network endpoint. `OLLAMA_URL` is currently a source-code constant, not an environment variable.
+The supplied version points to a LAN address. Replace it with your own local or network endpoint. `OLLAMA_URL` supports an environment variable and defaults to `http://192.168.1.17:11434`.
 
 For the server's llama-server integration, the default URL can be set through an environment variable:
 
@@ -111,9 +111,9 @@ Choose a topic, models, and voices for three roles:
 | --- | --- |
 | Pro | Argue in favor of the topic and respond to the opposing side. |
 | Con | Argue against the topic and respond to the Pro side. |
-| Moderator | Open the debate, address audience input, comment between rounds, and deliver a final judgment. |
+| Moderator | Open the debate, address audience input, and deliver a final judgment. |
 
-The debate includes opening statements followed by the configured rebuttal rounds. At the end, the moderator is prompted to score both sides out of ten. Scores are displayed when the reply matches the expected `Pro: X/10, Con: Y/10` format.
+The debate includes opening statements followed by the configured rebuttal rounds. At the end, the moderator receives the debate transcript, including opening statements, rebuttals, and audience exchanges, and is prompted to score both sides out of ten. Scores are displayed when the reply matches the expected `Pro: X/10, Con: Y/10` format.
 
 The scores are model-generated judgments, not an objective benchmark.
 
@@ -128,9 +128,9 @@ Use a reply's read-aloud button to queue it again. The separate **Open in Edge**
 | Setting | Location | Behavior |
 | --- | --- | --- |
 | `PORT` | Environment variable | Application port; defaults to `3000`. |
-| `OLLAMA_URL` | Constant in `enhanced_server_sync.js` | Base URL used for model discovery and Ollama generation. |
+| `OLLAMA_URL` | Environment variable | Base URL used for model discovery and Ollama generation. |
 | `LLAMA_SERVER_URL` | Environment variable | Default llama-server URL; the supplied fallback is a LAN address. |
-| `MODELS_DIR` | Environment variable | Directory recursively scanned for `.gguf` files; defaults to `./tags` relative to the launch directory. |
+| `MODELS_DIR` | Environment variable | Directory recursively scanned for `.gguf` files; defaults to `/home/llama.cpp/build/bin/models` on the Node.js host. |
 | Server URL | Browser interface | URL used by the llama-server connection check and the UI's generation request. The current setup uses one loaded model at a time. |
 
 Environment variables can be set in PowerShell before starting Node. The supplied server does not load `.env` files itself.
@@ -141,7 +141,8 @@ Environment variables can be set in PowerShell before starting Node. The supplie
 | --- | --- | --- |
 | `GET` | `/api/models` | Return available Ollama model names. |
 | `GET` | `/api/local-models` | Discover `.gguf` files beneath `MODELS_DIR`. |
-| `GET` | `/api/llama-server/health?url=...` | Check whether a GET request to the target server's root succeeds. |
+| `GET` | `/api/llama-server/health?url=...` | Check readiness through the target server's `/health` endpoint. |
+| `GET` | `/api/llama-server/models?url=...` | Discover loaded models through the remote server's `/v1/models`. |
 | `POST` | `/api/generate` | Queue generation using the requested backend, model, prompt, and optional parameters. |
 | `POST` | `/api/speak-with-edge` | Launch a separate speech page on the machine running Node.js. |
 
@@ -176,7 +177,7 @@ Run Node from the project root so relative paths resolve as intended. The server
 
 ## Current implementation notes
 
-- **One model at a time with llama.cpp:** The current integration connects to a single `llama-server` instance with one GGUF model loaded at a time. Both conversation participants?and the Pro, Con, and Moderator roles in debate mode?use that same loaded model, with different prompts and optional voices. The model selectors do not load separate models for each participant.
+- **One model at a time with llama.cpp:** The current integration connects to a single `llama-server` instance with one GGUF model loaded at a time. Both conversation participants, and the Pro, Con, and Moderator roles in debate mode, use that same loaded model, with different prompts and optional voices. The model selectors do not load separate models for each participant.
 - **Changing the llama.cpp model:** Stop and restart `llama-server` with a different `-m /path/to/model.gguf`, then click **Check Connection** in the UI to refresh the available model. The application does not load or switch GGUF files itself. This describes the current application setup, rather than a general limitation of llama.cpp.
 - **llama-server requests:** The UI discovers the loaded model through `/api/llama-server/models` and sends generation to `/api/generate` with `backend: "llama"`. The adapter uses `/v1/chat/completions` with instructions to produce one short turn.
 - **Ollama requests:** The UI explicitly selects `backend: "ollama"` for Ollama generation.
@@ -193,5 +194,5 @@ Run Node from the project root so relative paths resolve as intended. The server
 | Unexpected backend handles a request | Send an explicit `backend` value to `/api/generate`. |
 | No speech or missing voices | Check browser speech synthesis support and the voices available on the operating system. |
 | Edge does not open | The launcher runs on the Node.js host; on Windows, `msedge` must be resolvable. |
-| No GGUF files are listed | Verify `MODELS_DIR`; its default is `./tags`, not `./models`. |
+| No GGUF files are listed | Verify `MODELS_DIR`; its default is `/home/llama.cpp/build/bin/models` on the Node.js host. Remote models are discovered through llama-server. |
 | Port is already in use | Set a different `PORT` value before launching the server. |

@@ -222,8 +222,14 @@ app.post('/api/speak-with-edge', async (req, res) => {
 
     const cmd = process.platform === 'win32' ? 'msedge' : (process.platform === 'darwin' ? 'open' : 'xdg-open');
     const args = process.platform === 'win32' ? ['--app=' + html] : [html];
-    spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
-    res.json({ success: true });
+    const child = spawn(cmd, args, { stdio: 'ignore', detached: true, windowsHide: true });
+    child.once('error', (error) => {
+      if (!res.headersSent) res.status(500).json({ error: 'Could not launch speech window: ' + error.message });
+    });
+    child.once('spawn', () => {
+      child.unref();
+      res.json({ success: true });
+    });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
