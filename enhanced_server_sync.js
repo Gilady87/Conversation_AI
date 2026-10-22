@@ -29,10 +29,10 @@ const { spawn } = require('child_process');
 // ---- Config ----
 const PORT = process.env.PORT || 3000;
 
-const OLLAMA_URL = "http://192.168.1.17:11434";
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://192.168.1.17:11434';
 
 const DEFAULT_LLAMA_SERVER = process.env.LLAMA_SERVER_URL || 'http://192.168.1.17:8080';
-const MODELS_DIR = process.env.MODELS_DIR || path.join(process.cwd(), 'tags');
+const MODELS_DIR = process.env.MODELS_DIR || '/home/llama.cpp/build/bin/models';
 
 // ---- App / Server ----
 const app = express();
@@ -57,11 +57,8 @@ app.use(express.static(staticDir));
 class AsyncQueue {
   constructor() { this._q = Promise.resolve(); }
   enqueue(task) {
-    const run = this._q.then(() => task()).catch(err => {
-      console.error('AsyncQueue task error:', err);
-      // swallow to keep chain alive
-    });
-    this._q = run.then(() => undefined);
+    const run = this._q.then(() => task());
+    this._q = run.catch(() => undefined);
     return run;
   }
 }
@@ -81,7 +78,7 @@ function sanitizeResponseText(text) {
 }
 
 async function fetchJson(url, opts = {}) {
-  const res = await fetch(url, opts);
+  const res = await fetch(url, { timeout: 180000, ...opts });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`HTTP ${res.status} ${res.statusText} -> ${body.slice(0, 400)}`);
@@ -142,13 +139,25 @@ app.get('/api/local-models', (req, res) => {
 
 // Health check for llama-server
 app.get('/api/llama-server/health', async (req, res) => {
-  const url = req.query.url || DEFAULT_LLAMA_SERVER;
+  const url = String(req.query.url || DEFAULT_LLAMA_SERVER).replace(/\/+$/, '');
   try {
-    // Many llama-server builds expose /health or /
-    const health = await fetch(`${url}/`, { method: 'GET' });
-    res.json({ ok: health.ok, url });
+    const health = await fetchJson(`${url}/health`, { timeout: 10000 });
+    res.json({ ok: health.status === 'ok', url, status: health.status });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e), url });
+  }
+});
+
+// Query the remote server; local filesystem discovery cannot see remote GGUF files.
+app.get('/api/llama-server/models', async (req, res) => {
+  const url = String(req.query.url || DEFAULT_LLAMA_SERVER).replace(/\/+$/, '');
+  try {
+    const data = await fetchJson(`${url}/v1/models`, { timeout: 10000 });
+    const models = (data.data || []).map(m => m.id).filter(Boolean);
+    if (!models.length) throw new Error('No loaded models reported by llama-server');
+    res.json(models);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
   }
 });
 
@@ -170,7 +179,7 @@ app.post('/api/generate', async (req, res) => {
       await wait(60);
 
       const prefersOllama = backend === 'ollama';
-      const prefersLlama = backend === 'llama' || /\.gguf$/i.test(model);
+      const prefersLlama = (backend === 'llama' || backend === 'llama-server') || /\.gguf$/i.test(model);
 
       if (prefersOllama) {
         return await generateWithOllama({ model, prompt, params });
@@ -178,12 +187,7 @@ app.post('/api/generate', async (req, res) => {
 
       // Try llama-server first if requested or model looks local
       if (prefersLlama) {
-        try {
-          return await generateWithLlamaServer({ model, prompt, params, url: serverUrl || DEFAULT_LLAMA_SERVER });
-        } catch (e) {
-          console.warn('llama-server failed, falling back to Ollama:', e.message);
-          return await generateWithOllama({ model, prompt, params });
-        }
+        return await generateWithLlamaServer({ model, prompt, params, url: serverUrl || DEFAULT_LLAMA_SERVER });
       }
 
       // Default heuristic: try llama-server, fallback Ollama
@@ -252,24 +256,27 @@ function mapParamsToOllama(p = {}) {
 }
 
 async function generateWithLlamaServer({ url, model, prompt, params }) {
-  // llama-server (llama.cpp) often exposes /completion (or /v1/chat/completions for OpenAI compat)
-  // We'll try /completion first
+  // Use chat messages so the server applies its conversation template.
   const body = {
-    prompt,
+    model,
+    messages: [
+      { role: 'system', content: 'You are one participant in a live conversation. Write only your next turn, in 2-3 concise sentences. Stay on the requested topic and follow the assigned role. Do not invent other speakers, future turns, new topics, or instructions for continuing the conversation.' },
+      { role: 'user', content: prompt },
+    ],
+    stream: false,
     temperature: params.temperature ?? 0.7,
     top_p: params.top_p ?? 0.9,
     top_k: params.top_k ?? 40,
     repeat_penalty: params.repeat_penalty ?? 1.1,
-    n_predict: params.max_tokens ?? 512,
-    cache_prompt: true,
+    max_tokens: params.max_tokens ?? 256,
   };
-  const resp = await fetchJson(`${url}/completion`, {
+  const resp = await fetchJson(`${String(url).replace(/\/+$/, '')}/v1/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  // { content: "...", stop: true, ... } OR llama.cpp variations
-  const text = resp?.content ?? resp?.choices?.[0]?.text ?? resp?.generated_text ?? '';
+  const text = resp?.choices?.[0]?.message?.content ?? '';
+
   if (!text) throw new Error('Empty response from llama-server');
   return text;
 }

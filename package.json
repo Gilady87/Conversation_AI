@@ -2,14 +2,16 @@
   "name": "ollama-chat-server",
   "version": "1.0.0",
   "description": "Web Server for Ollama AI Chat System",
-  "main": "server.js",
+  "main": "enhanced_server_sync.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node enhanced_server_sync.js"
   },
   "keywords": ["ollama", "ai", "chat", "web", "server"],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "cors": "^2.8.5",
+    "node-fetch": "^2.7.0",
     "axios": "^1.6.5",
     "express": "^4.18.2",
     "socket.io": "^4.7.2",

@@ -4,7 +4,7 @@
 
 ConversationAI is a browser-based playground for exploring how local LLMs respond to each other. Run a two-participant conversation or a structured debate, choose voices for each role, and introduce your own messages while the session is running.
 
-Built with Node.js, Express, vanilla JavaScript, and the browser's Web Speech API. The supplied server includes integrations for Ollama and llama.cpp's `llama-server`; see [Current implementation notes](#current-implementation-notes) for the status of the llama-server UI connection.
+Built with Node.js, Express, vanilla JavaScript, and the browser's Web Speech API. The supplied server includes integrations for Ollama and llama.cpp's `llama-server`; see [Current implementation notes](#current-implementation-notes) for the current single-model llama-server setup.
 
 ![Conversation_AI demo](output.gif)
 
@@ -131,7 +131,7 @@ Use a reply's read-aloud button to queue it again. The separate **Open in Edge**
 | `OLLAMA_URL` | Constant in `enhanced_server_sync.js` | Base URL used for model discovery and Ollama generation. |
 | `LLAMA_SERVER_URL` | Environment variable | Default llama-server URL; the supplied fallback is a LAN address. |
 | `MODELS_DIR` | Environment variable | Directory recursively scanned for `.gguf` files; defaults to `./tags` relative to the launch directory. |
-| Server URL | Browser interface | URL used by the llama-server connection check and the UI's generation request. See the route mismatch below. |
+| Server URL | Browser interface | URL used by the llama-server connection check and the UI's generation request. The current setup uses one loaded model at a time. |
 
 Environment variables can be set in PowerShell before starting Node. The supplied server does not load `.env` files itself.
 
@@ -159,7 +159,7 @@ Example generation request:
 }
 ```
 
-For the server's llama-server adapter, use `"backend": "llama"` and optionally supply `serverUrl`. The adapter calls `/completion` and uses the model already loaded by that server.
+For the server's llama-server adapter, use `"backend": "llama"` and optionally supply `serverUrl`. The adapter calls `/v1/chat/completions` and uses the model already loaded by that server.
 
 ## Project structure
 
@@ -176,9 +176,10 @@ Run Node from the project root so relative paths resolve as intended. The server
 
 ## Current implementation notes
 
-- **llama-server UI route:** The supplied interface posts to `/api/llama-server/generate`, but the supplied server implements generation through `/api/generate`. The UI request must be aligned with that route, including `backend: "llama"`, a model label, and a nested `params` object, before this UI flow works end to end.
-- **Model selection with llama-server:** The UI shows `Current Model`; it does not load or switch GGUF models. File discovery through `/api/local-models` is separate from model loading.
-- **Ollama UI requests:** The interface sends the model and prompt to `/api/generate` without an explicit backend. The server therefore tries its default llama-server path first and falls back to Ollama. Add `backend: "ollama"` to that request if you want explicit Ollama routing.
+- **One model at a time with llama.cpp:** The current integration connects to a single `llama-server` instance with one GGUF model loaded at a time. Both conversation participants?and the Pro, Con, and Moderator roles in debate mode?use that same loaded model, with different prompts and optional voices. The model selectors do not load separate models for each participant.
+- **Changing the llama.cpp model:** Stop and restart `llama-server` with a different `-m /path/to/model.gguf`, then click **Check Connection** in the UI to refresh the available model. The application does not load or switch GGUF files itself. This describes the current application setup, rather than a general limitation of llama.cpp.
+- **llama-server requests:** The UI discovers the loaded model through `/api/llama-server/models` and sends generation to `/api/generate` with `backend: "llama"`. The adapter uses `/v1/chat/completions` with instructions to produce one short turn.
+- **Ollama requests:** The UI explicitly selects `backend: "ollama"` for Ollama generation.
 - **Stopping generation:** Stop aborts the browser request and discards stale replies, but does not explicitly cancel inference already running on the backend.
 - **Persistence:** The supplied conversation flow keeps its visible transcript in the page; it does not implement persistent session storage or transcript export.
 - **Socket.IO:** The server provides a connection greeting hook. Generation replies are delivered through HTTP, rather than streamed over Socket.IO.
@@ -188,7 +189,7 @@ Run Node from the project root so relative paths resolve as intended. The server
 | Symptom | What to check |
 | --- | --- |
 | No Ollama models appear | Verify `OLLAMA_URL`, connectivity from the Node.js host, and installed Ollama models. |
-| llama-server generation returns 404 | Check the UI/server route mismatch described above. |
+| llama-server generation returns 404 | Verify the server URL, restart the app after updates, and check that llama-server exposes /v1/chat/completions. |
 | Unexpected backend handles a request | Send an explicit `backend` value to `/api/generate`. |
 | No speech or missing voices | Check browser speech synthesis support and the voices available on the operating system. |
 | Edge does not open | The launcher runs on the Node.js host; on Windows, `msedge` must be resolvable. |

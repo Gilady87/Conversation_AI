@@ -583,7 +583,7 @@
       <div id="llamaServerConfig" class="llama-server-config">
         <div class="form-group">
           <label for="serverUrl">llama-server URL:</label>
-          <input type="url" id="serverUrl" value="http://127.0.0.1:8080" placeholder="http://127.0.0.1:8080">
+          <input type="url" id="serverUrl" value="http://192.168.1.17:8080" placeholder="http://192.168.1.17:8080">
         </div>
         <div style="margin-top: 0.5rem;">
           <span id="serverStatus" class="server-status offline">🔴 Disconnected</span>
@@ -873,6 +873,10 @@
       });
     });
 
+    serverUrlInput.addEventListener('change', () => {
+      if (currentBackend === 'llama-server' && !isChatting) loadModels();
+    });
+
     advancedParamsToggle.addEventListener('click', () => {
       advancedParamsContent.classList.toggle('active');
       toggleIcon.textContent = advancedParamsContent.classList.contains('active') ? '▲' : '▼';
@@ -906,7 +910,7 @@
         const response = await fetch(`/api/llama-server/health?url=${encodeURIComponent(url)}`);
         const data = await response.json();
         
-        if (response.ok) {
+        if (response.ok && data.ok) {
           serverStatus.className = 'server-status online';
           serverStatus.textContent = '🟢 Connected';
           updateStatus('✅ llama-server available!');
@@ -967,7 +971,12 @@
             return;
           }
         } else {
-          models = ['Current Model'];
+          const response = await fetch(`/api/llama-server/models?url=${encodeURIComponent(serverUrlInput.value.trim())}`);
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Failed to fetch llama-server models');
+          models = data;
+          serverStatus.className = 'server-status online';
+          serverStatus.textContent = '?? Connected';
         }
         
         const modelSelects = [model1Select, model2Select, proModelSelect, conModelSelect, moderatorModelSelect];
@@ -978,6 +987,10 @@
         startButton.disabled = false;
         updateStatus(`✅ ${currentBackend === 'ollama' ? 'Ollama models' : 'llama-server'} ready`);
       } catch (error) {
+        if (currentBackend === 'llama-server') {
+          serverStatus.className = 'server-status offline';
+          serverStatus.textContent = '?? Disconnected';
+        }
         console.error('Error loading models:', error);
         updateStatus('❌ Error loading models');
         startButton.disabled = true;
@@ -1196,7 +1209,7 @@
             method: 'POST',
             signal,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, model })
+            body: JSON.stringify({ prompt, model, backend: 'ollama' })
           });
           
           if (!response.ok) throw new Error(`Generation failed: HTTP ${response.status}`);
@@ -1206,18 +1219,22 @@
           }
           return data.response;
         } else {
-          const response = await fetch('/api/llama-server/generate', {
+          const response = await fetch('/api/generate', {
             method: 'POST',
             signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-              prompt, 
+              prompt,
+              model,
+              backend: 'llama',
               serverUrl: serverUrlInput.value,
+              params: {
               temperature: parseFloat(temperatureSlider.value),
               top_p: parseFloat(topPSlider.value),
               top_k: parseInt(topKSlider.value),
               repeat_penalty: parseFloat(repeatPenaltySlider.value),
               max_tokens: parseInt(maxTokensSlider.value)
+              }
             })
           });
           
@@ -1261,7 +1278,8 @@
           addMessage(response1, 'model1', model1);
           speak(response1, voice1Select);
 
-          prompt = response1;
+          prompt = `Topic: ${topic}. Your conversation partner said: "${response1}"
+Reply directly with your own perspective in 2-3 sentences. Write only your next turn.`;
         } else break;
         
         if (shouldStop) break;
@@ -1279,7 +1297,8 @@
           addMessage(response2, 'model2', model2);
           speak(response2, voice2Select);
 
-          prompt = response2;
+          prompt = `Topic: ${topic}. Your conversation partner said: "${response2}"
+Reply directly with your own perspective in 2-3 sentences. Write only your next turn.`;
         } else break;
       }
     }
